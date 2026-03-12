@@ -51,8 +51,8 @@ def transcribe():
     hallucinations = ["thank you", "thanks", "bye", "goodbye",
                       "you", "the", "thanks.", ""]
     if low in hallucinations:
-        return jsonify({"text": ""})
-    return jsonify({"text": text})
+        return "EMPTY", 200, {"Content-Type": "text/plain"}
+    return text, 200, {"Content-Type": "text/plain"}
 
 @app.route("/chat", methods=["POST"])
 def chat():
