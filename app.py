@@ -2,6 +2,8 @@ from flask import Flask, request, jsonify
 import requests
 import struct
 import os
+import threading
+import time
 
 app = Flask(__name__)
 GROQ_KEY = os.environ.get("GROQ_API_KEY")
@@ -13,13 +15,25 @@ def build_wav_header(data_size, rate=8000):
         1, 1, rate, rate * 2, 2, 16,
         b"data", data_size)
 
+def keep_alive():
+    while True:
+        time.sleep(270)  # ping itself every 4.5 minutes
+        try:
+            requests.get("https://esp32-espresso-server.onrender.com/ping", timeout=10)
+            print("Keep alive ping sent")
+        except:
+            pass
+
+# start keep alive thread on startup
+t = threading.Thread(target=keep_alive, daemon=True)
+t.start()
+
 @app.route("/ping")
 def ping():
     return "pong"
 
 @app.route("/transcribe", methods=["POST"])
 def transcribe():
-    # receive raw pcm, build wav, send to whisper
     pcm = request.data
     print("Received", len(pcm), "bytes")
     data_size = len(pcm)
@@ -55,7 +69,7 @@ def chat():
             "model": "llama-3.3-70b-versatile",
             "max_tokens": 150,
             "messages": [{"role": "system", "content":
-                "You are a helpful voice assistant in Dublin Ireland. "
+                "You are a helpful voice assistant. "
                 "Current time is " + time_str + ". "
                 "Be brief. Letters and numbers only, no special characters."
             }] + messages
