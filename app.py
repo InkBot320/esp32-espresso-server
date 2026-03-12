@@ -19,7 +19,7 @@ def ping():
 
 @app.route("/transcribe", methods=["POST"])
 def transcribe():
-    pcm = request.data
+    pcm = request.data  # server holds all the bytes, not ESP32
     wav = build_wav(pcm)
     r = requests.post(
         "https://api.groq.com/openai/v1/audio/transcriptions",
@@ -27,7 +27,13 @@ def transcribe():
         files={"file": ("a.wav", wav, "audio/wav")},
         data={"model": "whisper-large-v3-turbo", "language": "en"}
     )
-    return jsonify({"text": r.json().get("text", "")})
+    text = r.json().get("text", "").strip()
+    low = text.lower().strip(".,!? ")
+    hallucinations = ["thank you", "thanks", "bye", "goodbye",
+                      "you", "the", "thanks.", ""]
+    if low in hallucinations:
+        return jsonify({"text": ""})
+    return jsonify({"text": text})
 
 @app.route("/chat", methods=["POST"])
 def chat():
