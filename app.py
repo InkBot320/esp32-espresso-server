@@ -54,8 +54,3 @@ def chat():
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=10000)
-```
-
-Then go to Render → your service → **Settings** → **Start Command** and change it to:
-```
-gunicorn app:app --bind 0.0.0.0:10000
