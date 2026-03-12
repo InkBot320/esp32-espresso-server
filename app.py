@@ -6,12 +6,12 @@ import os
 app = Flask(__name__)
 GROQ_KEY = os.environ.get("GROQ_API_KEY")
 
-def build_wav(pcm_bytes, rate=8000):
-    n = len(pcm_bytes)
+def build_wav_header(data_size, rate=8000):
     return struct.pack("<4sI4s4sIHHIIHH4sI",
-        b"RIFF", 36 + n, b"WAVE", b"fmt ", 16,
+        b"RIFF", 36 + data_size,
+        b"WAVE", b"fmt ", 16,
         1, 1, rate, rate * 2, 2, 16,
-        b"data", n) + pcm_bytes
+        b"data", data_size)
 
 @app.route("/ping")
 def ping():
@@ -19,15 +19,20 @@ def ping():
 
 @app.route("/transcribe", methods=["POST"])
 def transcribe():
-    pcm = request.data  # server holds all the bytes, not ESP32
-    wav = build_wav(pcm)
+    # receive raw pcm, build wav, send to whisper
+    pcm = request.data
+    print("Received", len(pcm), "bytes")
+    data_size = len(pcm)
+    wav = build_wav_header(data_size) + pcm
     r = requests.post(
         "https://api.groq.com/openai/v1/audio/transcriptions",
         headers={"Authorization": "Bearer " + GROQ_KEY},
         files={"file": ("a.wav", wav, "audio/wav")},
         data={"model": "whisper-large-v3-turbo", "language": "en"}
     )
-    text = r.json().get("text", "").strip()
+    result = r.json()
+    print("Whisper:", result)
+    text = result.get("text", "").strip()
     low = text.lower().strip(".,!? ")
     hallucinations = ["thank you", "thanks", "bye", "goodbye",
                       "you", "the", "thanks.", ""]
