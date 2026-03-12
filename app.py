@@ -13,6 +13,10 @@ def build_wav(pcm_bytes, rate=8000):
         1, 1, rate, rate * 2, 2, 16,
         b"data", n) + pcm_bytes
 
+@app.route("/ping")
+def ping():
+    return "pong"
+
 @app.route("/transcribe", methods=["POST"])
 def transcribe():
     pcm = request.data
@@ -50,7 +54,8 @@ def chat():
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=10000)
+```
 
-@app.route("/ping")
-def ping():
-    return "pong"
+Then go to Render → your service → **Settings** → **Start Command** and change it to:
+```
+gunicorn app:app --bind 0.0.0.0:10000
