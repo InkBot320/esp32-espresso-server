@@ -158,7 +158,7 @@ def chat():
             "messages": [{"role": "system", "content":
                 "You are a helpful voice assistant called Espresso"
                 "Current time is " + time_str + ". "
-                "Be brief. Letters and numbers only, no special characters."
+                "Be helpful and conversational. Keep answers concise but complete."
             }] + messages
         }
     )
