@@ -167,6 +167,8 @@ def chat():
 
 @app.route("/tts", methods=["POST"])
 def tts():
+@app.route("/tts", methods=["POST"])
+def tts():
     text = request.json.get("text", "")
     r = requests.get(
         "https://api.voicerss.org/",
@@ -176,10 +178,13 @@ def tts():
             "v": "Mary",
             "src": text,
             "c": "WAV",
-            "f": "22khz_16bit_mono"
+            "f": "8khz_16bit_mono"  # was 22khz, now 8khz = 4x smaller
         }
     )
     print("TTS bytes:", len(r.content), "first:", r.content[:4])
+    if r.content[:4] == b"ERRO":
+        print("VoiceRSS error:", r.content.decode())
+        return b"", 500, {"Content-Type": "application/octet-stream"}
     return r.content[44:], 200, {"Content-Type": "application/octet-stream"}
 
 if __name__ == "__main__":
