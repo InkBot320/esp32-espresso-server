@@ -4,6 +4,7 @@ import struct
 import os
 import threading
 import time
+import io
 
 app = Flask(__name__)
 GROQ_KEY = os.environ.get("GROQ_API_KEY")
@@ -123,8 +124,7 @@ def home():
 def transcribe():
     pcm = request.data
     print("Received", len(pcm), "bytes")
-    data_size = len(pcm)
-    wav = build_wav_header(data_size) + pcm
+    wav = build_wav_header(len(pcm)) + pcm
     r = requests.post(
         "https://api.groq.com/openai/v1/audio/transcriptions",
         headers={"Authorization": "Bearer " + GROQ_KEY},
@@ -156,7 +156,7 @@ def chat():
             "model": "llama-3.3-70b-versatile",
             "max_tokens": 150,
             "messages": [{"role": "system", "content":
-                "You are a helpful voice assistant called Espresso"
+                "You are a helpful voice assistant called Espresso in Dublin Ireland. "
                 "Current time is " + time_str + ". "
                 "Be helpful and conversational. Keep answers concise but complete."
             }] + messages
@@ -177,7 +177,12 @@ def tts():
         },
         headers={"User-Agent": "Mozilla/5.0"}
     )
-    return r.content, 200, {"Content-Type": "audio/mpeg"}
+    mp3_data = r.content
+    from pydub import AudioSegment
+    audio = AudioSegment.from_mp3(io.BytesIO(mp3_data))
+    audio = audio.set_frame_rate(22050).set_channels(1).set_sample_width(2)
+    pcm = audio.raw_data
+    return pcm, 200, {"Content-Type": "application/octet-stream"}
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=10000)
