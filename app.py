@@ -8,6 +8,7 @@ import io
 
 app = Flask(__name__)
 GROQ_KEY = os.environ.get("GROQ_API_KEY")
+VOICERSS_KEY = os.environ.get("VOICERSS_API_KEY")
 
 def build_wav_header(data_size, rate=12000):
     return struct.pack("<4sI4s4sIHHIIHH4sI",
@@ -168,21 +169,18 @@ def chat():
 def tts():
     text = request.json.get("text", "")
     r = requests.get(
-        "https://translate.google.com/translate_tts",
+        "https://api.voicerss.org/",
         params={
-            "ie": "UTF-8",
-            "q": text,
-            "tl": "en",
-            "client": "tw-ob"
-        },
-        headers={"User-Agent": "Mozilla/5.0"}
+            "key": VOICERSS_KEY,
+            "hl": "en-ie",
+            "v": "Mary",
+            "src": text,
+            "c": "WAV",
+            "f": "22khz_16bit_mono"
+        }
     )
-    mp3_data = r.content
-    from pydub import AudioSegment
-    audio = AudioSegment.from_mp3(io.BytesIO(mp3_data))
-    audio = audio.set_frame_rate(22050).set_channels(1).set_sample_width(2)
-    pcm = audio.raw_data
-    return pcm, 200, {"Content-Type": "application/octet-stream"}
+    print("TTS bytes:", len(r.content), "first:", r.content[:4])
+    return r.content[44:], 200, {"Content-Type": "application/octet-stream"}
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=10000)
