@@ -8,7 +8,7 @@ import time
 app = Flask(__name__)
 GROQ_KEY = os.environ.get("GROQ_API_KEY")
 
-def build_wav_header(data_size, rate=8000):
+def build_wav_header(data_size, rate=12000):
     return struct.pack("<4sI4s4sIHHIIHH4sI",
         b"RIFF", 36 + data_size,
         b"WAVE", b"fmt ", 16,
@@ -17,20 +17,107 @@ def build_wav_header(data_size, rate=8000):
 
 def keep_alive():
     while True:
-        time.sleep(270)  # ping itself every 4.5 minutes
+        time.sleep(270)
         try:
             requests.get("https://esp32-espresso-server.onrender.com/ping", timeout=10)
             print("Keep alive ping sent")
         except:
             pass
 
-# start keep alive thread on startup
 t = threading.Thread(target=keep_alive, daemon=True)
 t.start()
 
 @app.route("/ping")
 def ping():
     return "pong"
+
+@app.route("/")
+def home():
+    return '''
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Espresso</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { background: #1a1a1a; color: #fff; font-family: sans-serif; height: 100vh; display: flex; flex-direction: column; }
+        #chat { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 10px; }
+        .msg { max-width: 70%; padding: 10px 15px; border-radius: 18px; line-height: 1.4; }
+        .user { background: #6f4e37; align-self: flex-end; }
+        .bot { background: #2a2a2a; align-self: flex-start; }
+        .bot-name { color: #c8956c; font-size: 11px; margin-bottom: 4px; }
+        #input-area { padding: 15px; display: flex; gap: 10px; background: #111; }
+        #input { flex: 1; padding: 12px; border-radius: 25px; border: none; background: #2a2a2a; color: #fff; font-size: 16px; outline: none; }
+        #send { padding: 12px 20px; border-radius: 25px; border: none; background: #6f4e37; color: #fff; cursor: pointer; font-size: 16px; }
+        #send:hover { background: #8b6347; }
+        .thinking { color: #888; font-style: italic; }
+    </style>
+</head>
+<body>
+    <div id="chat">
+        <div class="msg bot">
+            <div class="bot-name">Espresso</div>
+            Hey! Ask me anything.
+        </div>
+    </div>
+    <div id="input-area">
+        <input id="input" type="text" placeholder="Ask Espresso anything..." autofocus/>
+        <button id="send" onclick="sendMsg()">Send</button>
+    </div>
+    <script>
+        let messages = [];
+        const chat = document.getElementById("chat");
+        const input = document.getElementById("input");
+
+        input.addEventListener("keydown", e => {
+            if (e.key === "Enter") sendMsg();
+        });
+
+        function addMsg(text, role) {
+            const div = document.createElement("div");
+            div.className = "msg " + (role === "user" ? "user" : "bot");
+            if (role === "bot") {
+                const name = document.createElement("div");
+                name.className = "bot-name";
+                name.textContent = "Espresso";
+                div.appendChild(name);
+            }
+            div.appendChild(document.createTextNode(text));
+            chat.appendChild(div);
+            chat.scrollTop = chat.scrollHeight;
+            return div;
+        }
+
+        async function sendMsg() {
+            const text = input.value.trim();
+            if (!text) return;
+            input.value = "";
+            addMsg(text, "user");
+            messages.push({ role: "user", content: text });
+
+            const thinking = addMsg("thinking...", "bot");
+            thinking.classList.add("thinking");
+
+            try {
+                const r = await fetch("/chat", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ time: new Date().toLocaleString(), messages })
+                });
+                const data = await r.json();
+                thinking.remove();
+                const reply = data.reply || "No response";
+                addMsg(reply, "bot");
+                messages.push({ role: "assistant", content: reply });
+            } catch(e) {
+                thinking.textContent = "Error, try again.";
+            }
+        }
+    </script>
+</body>
+</html>
+'''
 
 @app.route("/transcribe", methods=["POST"])
 def transcribe():
@@ -69,13 +156,28 @@ def chat():
             "model": "llama-3.3-70b-versatile",
             "max_tokens": 150,
             "messages": [{"role": "system", "content":
-                "You are a helpful voice assistant. "
+                "You are a helpful voice assistant called Espresso in Dublin Ireland. "
                 "Current time is " + time_str + ". "
                 "Be brief. Letters and numbers only, no special characters."
             }] + messages
         }
     )
     return jsonify({"reply": r.json()["choices"][0]["message"]["content"]})
+
+@app.route("/tts", methods=["POST"])
+def tts():
+    text = request.json.get("text", "")
+    r = requests.get(
+        "https://translate.google.com/translate_tts",
+        params={
+            "ie": "UTF-8",
+            "q": text,
+            "tl": "en",
+            "client": "tw-ob"
+        },
+        headers={"User-Agent": "Mozilla/5.0"}
+    )
+    return r.content, 200, {"Content-Type": "audio/mpeg"}
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=10000)
