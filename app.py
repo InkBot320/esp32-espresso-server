@@ -155,7 +155,7 @@ def chat():
         },
         json={
             "model": "llama-3.3-70b-versatile",
-            "max_tokens": 150,
+            "max_tokens": 60,
             "messages": [{"role": "system", "content":
                 "You are a helpful voice assistant called Espresso in Dublin Ireland. "
                 "Current time is " + time_str + ". "
